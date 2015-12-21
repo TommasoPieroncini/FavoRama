@@ -1,5 +1,6 @@
 package com.favorama.tommaso.favorama;
 
+import android.content.Context;
 import android.content.Intent;
 import android.os.AsyncTask;
 import android.support.v7.app.ActionBarActivity;
@@ -22,6 +23,8 @@ import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.http.message.BasicNameValuePair;
 
 import java.io.BufferedReader;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -30,6 +33,7 @@ import java.util.List;
 
 public class LoginActivity extends ActionBarActivity {
 
+    String[] authentificationFromStorage;
     EditText username;
     EditText password;
     Button login;
@@ -41,11 +45,20 @@ public class LoginActivity extends ActionBarActivity {
     Intent intent2;
     Button register;
     Bundle bundle;
+    Intent recoverIntent;
+    Bundle recoverBundle;
+    Boolean infoDeleted = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_login);
+        authentificationData = new ArrayList<>();
+        recoverIntent = getIntent();
+        recoverBundle = recoverIntent.getExtras();
+        if (recoverBundle != null){
+            infoDeleted = true;
+        }
         intent1 = new Intent(this, AnswerRequestActivity.class);
         intent2 = new Intent(this, RegistrationActivity.class);
         username = (EditText) findViewById(R.id.editText5);
@@ -53,7 +66,55 @@ public class LoginActivity extends ActionBarActivity {
         bundle = new Bundle();
         login = (Button) findViewById(R.id.button2);
         register = (Button) findViewById(R.id.button3);
-        authentificationData = new ArrayList<>();
+
+        //IF AUTH DATA IS IN INTERNAL STORAGE LOGIN ACTIVITY IS SKIPPED
+        try {
+            FileInputStream fis = openFileInput("FavoRama_Authentification_Data.txt");
+            InputStreamReader isr = new InputStreamReader(fis);
+            BufferedReader bufferedReader = new BufferedReader(isr);
+            StringBuilder sb = new StringBuilder();
+            String line;
+            while ((line = bufferedReader.readLine()) != null) {
+                sb.append(line);
+                Log.e("log_tag 11", line);
+            }
+            authentificationFromStorage = sb.toString().split(",");
+        } catch(Exception e) {
+            Log.e("log_tag 10", "Failed to retrieve data: " + e);
+            if (infoDeleted == true) {
+                Toast.makeText(LoginActivity.this, "You logged out", Toast.LENGTH_LONG).show();
+            }
+        }
+        if (authentificationFromStorage != null){
+            inputUsername = authentificationFromStorage[0];
+            inputPassword = authentificationFromStorage[1];
+            authentificationData.add(new BasicNameValuePair("username",inputUsername));
+            authentificationData.add(new BasicNameValuePair("password",inputPassword));
+            try{
+                Log.e("log_tag12","gettingPermission");
+                access = new getPermission().execute(authentificationData).get();
+                Log.e("log_tag13","gotPermission");
+            } catch (Exception e){
+                Log.e("log_tag5","FAILED TO GET PERMISSION RESPONSE" + e);
+            }
+
+            if (access.equals("allowed")){
+                Log.e("log_tag6", "in access");
+                bundle.putString("username",inputUsername);
+                bundle.putString("password", inputPassword);
+                intent1.putExtras(bundle);
+                startActivity(intent1);
+                finish();
+            } else if(access.equals("denied")) {
+                Toast.makeText(LoginActivity.this, "We lost track of your data! Why don't you register again?", Toast.LENGTH_LONG).show();
+            } else {
+                Log.e("log_tag_phpnotworking",access);
+            }
+        }
+
+
+        //IF AUTH DATA IS NOT IN INTERNAL STORAGE, APP STAYS ON LOGIN ACTIVITY
+
         register.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -67,6 +128,7 @@ public class LoginActivity extends ActionBarActivity {
                 inputPassword = password.getText().toString();
                 authentificationData.add(new BasicNameValuePair("username",inputUsername));
                 authentificationData.add(new BasicNameValuePair("password",inputPassword));
+
                 try{
                     access = new getPermission().execute(authentificationData).get();
                 } catch (Exception e){
@@ -75,11 +137,22 @@ public class LoginActivity extends ActionBarActivity {
 
                 if (access.equals("allowed")){
                     Log.e("log_tag6", "in access");
+                    String fileName = "FavoRama_Authentification_Data.txt";
+                    String content = inputUsername + "," + inputPassword;
+
+                    FileOutputStream outputStream = null;
+                    try {
+                        outputStream = openFileOutput(fileName, Context.MODE_PRIVATE);
+                        outputStream.write(content.getBytes());
+                        outputStream.close();
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
                     bundle.putString("username",inputUsername);
                     bundle.putString("password", inputPassword);
                     intent1.putExtras(bundle);
                     startActivity(intent1);
-                } else {
+                } else if(access.equals("denied")) {
                     Toast.makeText(getApplicationContext(), "Wrong username or password", Toast.LENGTH_LONG).show();
                 }
             }
@@ -90,7 +163,7 @@ class getPermission extends AsyncTask<List<NameValuePair>, Void, String> {
 
 
     @Override
-    protected String doInBackground(List<NameValuePair>... authentificationDatas) {
+    protected String doInBackground(List<NameValuePair>... authentificationData) {
         String answer;
         InputStream is = null;
         BufferedReader br = null;
@@ -98,7 +171,7 @@ class getPermission extends AsyncTask<List<NameValuePair>, Void, String> {
         try {
             HttpClient httpClient = new DefaultHttpClient();
             HttpPost httpPost = new HttpPost("http://128.61.104.207:8165/favorama_login.php");
-            httpPost.setEntity(new UrlEncodedFormEntity(authentificationDatas[0]));
+            httpPost.setEntity(new UrlEncodedFormEntity(authentificationData[0]));
             HttpResponse response = httpClient.execute(httpPost);
             HttpEntity entity = response.getEntity();
             is = entity.getContent();
@@ -148,7 +221,7 @@ class getPermission extends AsyncTask<List<NameValuePair>, Void, String> {
         int id = item.getItemId();
 
         //noinspection SimplifiableIfStatement
-        if (id == R.id.action_settings) {
+        if (id == R.id.action_settings2) {
             return true;
         }
 

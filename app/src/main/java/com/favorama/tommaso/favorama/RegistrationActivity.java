@@ -1,5 +1,6 @@
 package com.favorama.tommaso.favorama;
 
+import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
 import android.support.v7.app.ActionBarActivity;
@@ -14,6 +15,11 @@ import android.widget.Toast;
 import org.apache.http.NameValuePair;
 import org.apache.http.message.BasicNameValuePair;
 
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -53,20 +59,38 @@ public class RegistrationActivity extends ActionBarActivity {
                 inputPassword = password.getText().toString();
                 inputPassword2 = password2.getText().toString();
                 if (inputPassword.equals(inputPassword2)) {
-                    inputData.add(new BasicNameValuePair("email", inputEmail));
-                    inputData.add(new BasicNameValuePair("username", inputUsername));
-                    inputData.add(new BasicNameValuePair("password", inputPassword));
-                    try{
-                        serverResponse = new sendData().execute(inputData).get().toString();
-                    } catch (Exception e){
-                        Log.e("log_tag3", "FAILED TO GET RESPONSE FROM sendData");
+                    if (inputEmail.contains("@")) {
+                        inputData.add(new BasicNameValuePair("email", inputEmail));
+                        inputData.add(new BasicNameValuePair("username", inputUsername));
+                        inputData.add(new BasicNameValuePair("password", inputPassword));
+                        try {
+                            serverResponse = new sendData().execute(inputData).get().toString();
+                        } catch (Exception e) {
+                            Log.e("log_tag3", "FAILED TO GET RESPONSE FROM sendData");
+                        }
+                        String fileName = "FavoRama_Authentification_Data.txt";
+                        String content = inputUsername + "," + inputPassword;
+
+                        FileOutputStream outputStream = null;
+                        try {
+                            outputStream = openFileOutput(fileName, Context.MODE_PRIVATE);
+                            outputStream.write(content.getBytes());
+                            outputStream.close();
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        }
+
+                        Toast.makeText(getApplicationContext(), serverResponse, Toast.LENGTH_LONG).show();
+                        if (serverResponse.equals("Thank you for registering!")) {
+                            startActivity(intent);
+                        } else {
+                            Toast.makeText(getApplicationContext(), serverResponse, Toast.LENGTH_LONG).show();
+                        }
+                    } else {
+                        Toast.makeText(getApplicationContext(), "Invalid e-mail", Toast.LENGTH_LONG).show();
                     }
-                    if (serverResponse.equals("Thank you for registering!")) {
-                        startActivity(intent);
-                    }
-                    Toast.makeText(getApplicationContext(), serverResponse, Toast.LENGTH_LONG).show();
                 } else {
-                    Toast.makeText(getApplicationContext(), "Wrong input, try again!", Toast.LENGTH_LONG).show();
+                    Toast.makeText(getApplicationContext(), "Passwords don't match", Toast.LENGTH_LONG).show();
                 }
             }
         });
